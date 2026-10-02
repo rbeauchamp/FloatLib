@@ -31,12 +31,16 @@ accuracy together still locate the quotient, and
 `toReal_ofModel_roundWithAccuracy_zero_eq_roundAt` rounds that case.
 
 The resulting theorems `toReal_ofModel_mul_toModel_eq_roundAt` and
-`toReal_ofModel_div_toModel_eq_roundAt` take finite operands of any conventional IEEE descriptor
-and a finite result, with no hypothesis about provisional exponents or quotients. `roundAt` has no
-upper exponent bound, so the finite-result hypothesis excludes overflow. `isFinite_toModel`
-converts between Lean core's finiteness test and `isFinite`. These statements are checked
-against the logical floating-point model shipped with Lean 4.34 and do not verify the machine
-instructions used by compiled native code.
+`toReal_ofModel_div_toModel_eq_roundAt` take format words of any conventional IEEE descriptor and
+a finite result, with no hypothesis about provisional exponents or quotients. A finite result
+implies the operand conditions the statements omit: a NaN or infinite factor, a NaN or infinite
+dividend, and a zero divisor each give a NaN or an infinity, which
+`isFinite_ofModel_notANumber` and `isFinite_ofModel_infinity` show is not finite. The division
+theorem also assumes a finite divisor, because a finite dividend over an infinite divisor is a
+finite zero. `roundAt` has no upper exponent bound, so the finite-result hypothesis also excludes
+overflow. `isFinite_toModel` converts between Lean core's finiteness test and `isFinite`. These
+statements are checked against the logical floating-point model shipped with Lean 4.34 and do not
+verify the machine instructions used by compiled native code.
 -/
 
 @[expose] public section
@@ -415,17 +419,29 @@ theorem isFinite_toModel {fmt : FloatFormat} (hfmt : fmt.isIEEE = true) (x : Mod
   rw [← toDyadic?_isSome_eq_isFinite, toDyadic?_ieee_eq_model fmt hfmt x]
   cases toModel x <;> rfl
 
-/--
-For finite operands and a finite result, Lean core's unpacked multiplication of the values
-unpacked from two format words is one nearest-even rounding of their exact real product.
+/-- The word packed from Lean's NaN is not finite under a conventional IEEE descriptor. -/
+theorem isFinite_ofModel_notANumber (fmt : FloatFormat) (hfmt : fmt.isIEEE = true) :
+    isFinite (ofModel fmt .notANumber) = false := by
+  have hencoding := (FloatFormat.isIEEE_eq_true_iff fmt).mp hfmt |>.1
+  have hexponent : expField (ofModel fmt .notANumber) = FloatFormat.expAllOnesNat fmt := by
+    rw [← unpackExponent_toNat]
+    unfold toModelBits ofModel ofModelBits Float.Model.UnpackedFloat.pack packedNaN
+    rw [unpackExponent_packComponents]
+    exact toNat_neg_one_exponentBits fmt
+  simp [isFinite, IEEE.isFinite, hencoding, hexponent]
 
-Unlike `toReal_ofModel_mul_finite_eq_roundAt`, there is no exponent hypothesis: unpacked format
-words satisfy the precondition of `roundWithAccuracy` and their product keeps it. Arbitrary
-unpacked operands need not, so that theorem keeps its hypothesis. Signed zeros are finite
-operands.
+/--
+For a finite result, Lean core's unpacked multiplication of the values unpacked from two format
+words is one nearest-even rounding of their exact real product.
+
+A finite result implies finite operands, because every product with a NaN or infinite factor is
+a NaN or an infinity. Unlike `toReal_ofModel_mul_finite_eq_roundAt`, there is no exponent
+hypothesis: unpacked format words satisfy the precondition of `roundWithAccuracy` and their
+product keeps it. Arbitrary unpacked operands need not, so that theorem keeps its hypothesis.
+Signed zeros are finite operands.
 -/
 theorem toReal_ofModel_mul_toModel_eq_roundAt {fmt : FloatFormat} (hfmt : fmt.isIEEE = true)
-    (x y : Model fmt) (hx : isFinite x = true) (hy : isFinite y = true)
+    (x y : Model fmt)
     (hfinite :
       isFinite
         (ofModel fmt
@@ -436,20 +452,22 @@ theorem toReal_ofModel_mul_toModel_eq_roundAt {fmt : FloatFormat} (hfmt : fmt.is
           (Float.Model.UnpackedFloat.mul (FloatFormat.toModel fmt)
             (toModel x) (toModel y))) =
       roundAt fmt (toReal x * toReal y) := by
+  have hnan := isFinite_ofModel_notANumber fmt hfmt
+  have hinfinity := isFinite_ofModel_infinity fmt
+    (FloatFormat.supportsInfinity_eq_true_of_isIEEE fmt hfmt)
   obtain ⟨ux, hux⟩ : ∃ ux, toModel x = ux := ⟨_, rfl⟩
   obtain ⟨uy, huy⟩ : ∃ uy, toModel y = uy := ⟨_, rfl⟩
-  rw [← isFinite_toModel hfmt, hux] at hx
-  rw [← isFinite_toModel hfmt, huy] at hy
   rw [hux, huy] at hfinite
   rw [toReal_eq_unpackedToReal_toModel hfmt x, toReal_eq_unpackedToReal_toModel hfmt y,
     hux, huy]
   cases ux with
-  | notANumber => simp [Float.Model.UnpackedFloat.isFinite] at hx
-  | infinity _ => simp [Float.Model.UnpackedFloat.isFinite] at hx
+  | notANumber => cases uy <;> simp [Float.Model.UnpackedFloat.mul, hnan] at hfinite
+  | infinity _ =>
+    cases uy <;> simp [Float.Model.UnpackedFloat.mul, hnan, hinfinity] at hfinite
   | zero sign₁ =>
     cases uy with
-    | notANumber => simp [Float.Model.UnpackedFloat.isFinite] at hy
-    | infinity _ => simp [Float.Model.UnpackedFloat.isFinite] at hy
+    | notANumber => simp [Float.Model.UnpackedFloat.mul, hnan] at hfinite
+    | infinity _ => simp [Float.Model.UnpackedFloat.mul, hnan] at hfinite
     | zero sign₂ =>
       simp only [Float.Model.UnpackedFloat.mul, unpackedToReal_zero, zero_mul, roundAt_zero]
       exact toReal_ofModel_zero fmt hfmt _
@@ -458,8 +476,8 @@ theorem toReal_ofModel_mul_toModel_eq_roundAt {fmt : FloatFormat} (hfmt : fmt.is
       exact toReal_ofModel_zero fmt hfmt _
   | finite sign₁ mantissa₁ exponent₁ hmantissa₁ =>
     cases uy with
-    | notANumber => simp [Float.Model.UnpackedFloat.isFinite] at hy
-    | infinity _ => simp [Float.Model.UnpackedFloat.isFinite] at hy
+    | notANumber => simp [Float.Model.UnpackedFloat.mul, hnan] at hfinite
+    | infinity _ => simp [Float.Model.UnpackedFloat.mul, hinfinity] at hfinite
     | zero sign₂ =>
       simp only [Float.Model.UnpackedFloat.mul, unpackedToReal_zero, mul_zero, roundAt_zero]
       exact toReal_ofModel_zero fmt hfmt _
@@ -472,16 +490,18 @@ theorem toReal_ofModel_mul_toModel_eq_roundAt {fmt : FloatFormat} (hfmt : fmt.is
         hfinite
 
 /--
-For finite operands, a nonzero divisor, and a finite result, Lean core's unpacked division of the
-values unpacked from two format words is one nearest-even rounding of their exact real quotient.
+For a finite divisor and a finite result, Lean core's unpacked division of the values unpacked
+from two format words is one nearest-even rounding of their exact real quotient.
 
-Unlike `toReal_ofModel_div_finite_eq_roundAt`, there is no hypothesis on `divCore`. The quotient
-may lie below the least positive subnormal, where it rounds to zero or to that subnormal. A signed
-zero dividend is a finite operand.
+A finite result implies a finite dividend and a nonzero divisor, because every quotient with a
+NaN or infinite dividend or a zero divisor is a NaN or an infinity. It does not imply a finite
+divisor: a finite dividend over an infinite divisor is a finite zero. Unlike
+`toReal_ofModel_div_finite_eq_roundAt`, there is no hypothesis on `divCore`. The quotient may lie
+below the least positive subnormal, where it rounds to zero or to that subnormal. A signed zero
+dividend is a finite operand.
 -/
 theorem toReal_ofModel_div_toModel_eq_roundAt {fmt : FloatFormat} (hfmt : fmt.isIEEE = true)
-    (x y : Model fmt) (hx : isFinite x = true) (hy : isFinite y = true)
-    (hy0 : isZero y = false)
+    (x y : Model fmt) (hy : isFinite y = true)
     (hfinite :
       isFinite
         (ofModel fmt
@@ -492,25 +512,24 @@ theorem toReal_ofModel_div_toModel_eq_roundAt {fmt : FloatFormat} (hfmt : fmt.is
           (Float.Model.UnpackedFloat.div (FloatFormat.toModel fmt)
             (toModel x) (toModel y))) =
       roundAt fmt (toReal x / toReal y) := by
-  have hyReal : toReal y ≠ 0 := fun hzero ↦ by
-    rw [(isZero_eq_true_iff_toReal_eq_zero y hy).mpr hzero] at hy0
-    cases hy0
+  have hnan := isFinite_ofModel_notANumber fmt hfmt
+  have hinfinity := isFinite_ofModel_infinity fmt
+    (FloatFormat.supportsInfinity_eq_true_of_isIEEE fmt hfmt)
   obtain ⟨ux, hux⟩ : ∃ ux, toModel x = ux := ⟨_, rfl⟩
   obtain ⟨uy, huy⟩ : ∃ uy, toModel y = uy := ⟨_, rfl⟩
-  rw [← isFinite_toModel hfmt, hux] at hx
   rw [← isFinite_toModel hfmt, huy] at hy
   rw [hux, huy] at hfinite
-  rw [toReal_eq_unpackedToReal_toModel hfmt y, huy] at hyReal
   rw [toReal_eq_unpackedToReal_toModel hfmt x, toReal_eq_unpackedToReal_toModel hfmt y,
     hux, huy]
   cases uy with
   | notANumber => simp [Float.Model.UnpackedFloat.isFinite] at hy
   | infinity _ => simp [Float.Model.UnpackedFloat.isFinite] at hy
-  | zero sign₂ => exact absurd (unpackedToReal_zero sign₂) hyReal
+  | zero _ =>
+    cases ux <;> simp [Float.Model.UnpackedFloat.div, hnan, hinfinity] at hfinite
   | finite sign₂ mantissa₂ exponent₂ hmantissa₂ =>
     cases ux with
-    | notANumber => simp [Float.Model.UnpackedFloat.isFinite] at hx
-    | infinity _ => simp [Float.Model.UnpackedFloat.isFinite] at hx
+    | notANumber => simp [Float.Model.UnpackedFloat.div, hnan] at hfinite
+    | infinity _ => simp [Float.Model.UnpackedFloat.div, hinfinity] at hfinite
     | zero sign₁ =>
       simp only [Float.Model.UnpackedFloat.div, unpackedToReal_zero, zero_div, roundAt_zero]
       exact toReal_ofModel_zero fmt hfmt _

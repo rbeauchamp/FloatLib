@@ -336,11 +336,12 @@ conditions have been established.
 
 Operands unpacked from format words satisfy the exponent conditions. The
 [unconditional forms](https://github.com/lean-dojo/FloatLib/blob/main/FloatLib/Floats/Formats/BinaryInterchange/Arithmetic/LeanModel/MulDiv.lean)
-therefore take finite operands and a finite result, plus a nonzero divisor for division, and
-conclude
+therefore take a finite result, plus a finite divisor for division, and conclude
 $\operatorname{roundAt}_{\mathrm{fmt}}(\operatorname{value}(x)\cdot\operatorname{value}(y))$ and
-$\operatorname{roundAt}_{\mathrm{fmt}}(\operatorname{value}(x)/\operatorname{value}(y))$. The
-nonzero-quotient condition can still fail for such operands. When `divCore` returns a zero
+$\operatorname{roundAt}_{\mathrm{fmt}}(\operatorname{value}(x)/\operatorname{value}(y))$. A
+finite result already excludes a NaN or infinite factor, a NaN or infinite dividend, and a zero
+divisor, because each of those gives a NaN or an infinity. The nonzero-quotient condition can
+still fail for finite operands with a finite quotient. When `divCore` returns a zero
 provisional quotient, the magnitude of the exact quotient is below the least positive subnormal.
 The selected exponent and remainder accuracy together determine rounding to signed zero or a
 signed least subnormal. For example, the least positive subnormal divided by `1.5` rounds back
