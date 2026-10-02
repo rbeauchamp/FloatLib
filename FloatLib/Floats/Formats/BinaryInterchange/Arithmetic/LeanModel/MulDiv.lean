@@ -15,7 +15,8 @@ public import FloatLib.Floats.Formats.BinaryInterchange.Arithmetic.LeanModel
 core's unpacked multiplication and division with one nearest-even rounding of the exact real
 result. Both assume the documented precondition of `roundWithAccuracy`, that the provisional
 exponent needs no left shift, and the division theorem also assumes a nonzero provisional
-quotient. This module discharges those hypotheses.
+quotient. This module proves the exponent hypotheses and removes the quotient hypothesis, which
+can fail for finite operands with a finite quotient.
 
 The precondition holds exactly when the exponent is at or below the format's least exponent or
 the mantissa has a leading bit at the format's precision. Every finite value unpacked from a
@@ -285,33 +286,26 @@ private theorem accuracyRepresents_zero_accuracyOfFraction
     (numerator denominator : Nat) (hlt : numerator < denominator) :
     accuracyRepresents 0 (accuracyOfFraction numerator denominator)
       ((numerator : Real) / denominator) := by
-  have hdenominatorPos : (0 : Real) < denominator := by
+  have hdenominator : (0 : Real) < denominator := by
     exact_mod_cast Nat.zero_lt_of_lt hlt
   unfold accuracyOfFraction
   split_ifs with hnumerator
   · simp [accuracyRepresents, hnumerator]
-  have hnumeratorPos : (0 : Real) < numerator := by
-    exact_mod_cast Nat.pos_of_ne_zero hnumerator
-  have hltReal : (numerator : Real) < denominator := by
-    exact_mod_cast hlt
-  rcases hcompare : compare (2 * numerator) denominator with _ | _ | _
-  · rw [Nat.compare_eq_lt] at hcompare
-    have hcompareReal : (2 : Real) * numerator < denominator := by
-      exact_mod_cast hcompare
+  rcases hcompare : compare (2 * numerator) denominator with _ | _ | _ <;>
     simp only [accuracyRepresents, Nat.cast_zero, zero_add]
-    exact ⟨div_pos hnumeratorPos hdenominatorPos,
-      (div_lt_iff₀ hdenominatorPos).2 (by linarith)⟩
-  · rw [Nat.compare_eq_eq] at hcompare
-    have hcompareReal : (2 : Real) * numerator = denominator := by
-      exact_mod_cast hcompare
-    simp only [accuracyRepresents, Nat.cast_zero, zero_add]
-    exact (div_eq_iff hdenominatorPos.ne').2 (by linarith)
-  · rw [Nat.compare_eq_gt] at hcompare
-    have hcompareReal : (denominator : Real) < 2 * numerator := by
-      exact_mod_cast hcompare
-    simp only [accuracyRepresents, Nat.cast_zero, zero_add]
-    exact ⟨(lt_div_iff₀ hdenominatorPos).2 (by linarith),
-      (div_lt_one hdenominatorPos).2 hltReal⟩
+  · have hhalf : (2 : Real) * numerator < denominator := by
+      exact_mod_cast Nat.compare_eq_lt.mp hcompare
+    have hpos : (0 : Real) < numerator := by
+      exact_mod_cast Nat.pos_of_ne_zero hnumerator
+    exact ⟨div_pos hpos hdenominator, (div_lt_iff₀ hdenominator).2 (by linarith)⟩
+  · have hhalf : (2 : Real) * numerator = denominator := by
+      exact_mod_cast Nat.compare_eq_eq.mp hcompare
+    exact (div_eq_iff hdenominator.ne').2 (by linarith)
+  · have hhalf : (denominator : Real) < 2 * numerator := by
+      exact_mod_cast Nat.compare_eq_gt.mp hcompare
+    have hltReal : (numerator : Real) < denominator := by
+      exact_mod_cast hlt
+    exact ⟨(lt_div_iff₀ hdenominator).2 (by linarith), (div_lt_one hdenominator).2 hltReal⟩
 
 /--
 For finite nonzero operands and a finite result, Lean core's unpacked division has the same

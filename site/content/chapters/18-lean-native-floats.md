@@ -334,13 +334,15 @@ have narrower hypotheses. Multiplication requires a provisional exponent satisfy
 `divCore`. Their real-valued conclusions apply once those conditions and the stated finite
 conditions have been established.
 
-Operands unpacked from format words meet those conditions. The
+Operands unpacked from format words satisfy the exponent conditions. The
 [unconditional forms](https://github.com/lean-dojo/FloatLib/blob/main/FloatLib/Floats/Formats/BinaryInterchange/Arithmetic/LeanModel/MulDiv.lean)
-take finite operands and a finite result, plus a nonzero divisor for division, and conclude
+therefore take finite operands and a finite result, plus a nonzero divisor for division, and
+conclude
 $\operatorname{roundAt}_{\mathrm{fmt}}(\operatorname{value}(x)\cdot\operatorname{value}(y))$ and
 $\operatorname{roundAt}_{\mathrm{fmt}}(\operatorname{value}(x)/\operatorname{value}(y))$. The
-division theorem includes quotients below the least positive subnormal, where `divCore` returns
-a zero provisional quotient and the remainder alone decides between zero and that subnormal.
+nonzero-quotient condition can still fail for such operands: when the exact quotient lies below
+the least positive subnormal, `divCore` returns a zero provisional quotient and the remainder
+alone decides between zero and that subnormal. The division theorem proves that case separately.
 
 All these proofs concern Lean's logical definitions. Compiled native calls still use external
 runtime functions and hardware instructions. The optional guarded host operations below retain
