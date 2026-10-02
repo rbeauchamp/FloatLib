@@ -340,9 +340,10 @@ therefore take finite operands and a finite result, plus a nonzero divisor for d
 conclude
 $\operatorname{roundAt}_{\mathrm{fmt}}(\operatorname{value}(x)\cdot\operatorname{value}(y))$ and
 $\operatorname{roundAt}_{\mathrm{fmt}}(\operatorname{value}(x)/\operatorname{value}(y))$. The
-nonzero-quotient condition can still fail for such operands: when the exact quotient lies below
-the least positive subnormal, `divCore` returns a zero provisional quotient and the remainder
-alone decides between zero and that subnormal. The division theorem proves that case separately.
+nonzero-quotient condition can still fail for such operands. `divCore` returns a zero provisional
+quotient only when the exact quotient lies below the least positive subnormal, as for the least
+positive subnormal divided by `1.5`, and the remainder alone then decides between zero and that
+subnormal. The division theorem proves that case separately.
 
 All these proofs concern Lean's logical definitions. Compiled native calls still use external
 runtime functions and hardware instructions. The optional guarded host operations below retain

@@ -22,8 +22,8 @@ The precondition holds exactly when the exponent is at or below the format's lea
 the mantissa has a leading bit at the format's precision. Every finite value unpacked from a
 format word has that shape, a product of two such values keeps it, and `divCore` chooses its
 exponent so that every quotient of nonzero mantissas has it. `divCore` returns a zero provisional
-quotient when the exact quotient lies below the exponent it selects, as for the least positive
-subnormal divided by `1.5`. Its remainder accuracy still locates the quotient, and
+quotient when the exact quotient lies below one unit at the exponent it selects, as for the least
+positive subnormal divided by `1.5`. Its remainder accuracy still locates the quotient, and
 `toReal_ofModel_roundWithAccuracy_zero_eq_roundAt` rounds that case.
 
 The resulting theorems `toReal_ofModel_mul_toModel_eq_roundAt` and
