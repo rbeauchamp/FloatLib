@@ -15,16 +15,20 @@ public import FloatLib.Floats.Formats.BinaryInterchange.Arithmetic.LeanModel
 core's unpacked multiplication and division with one nearest-even rounding of the exact real
 result. Both assume the documented precondition of `roundWithAccuracy`, that the provisional
 exponent needs no left shift, and the division theorem also assumes a nonzero provisional
-quotient. This module proves the exponent hypotheses and removes the quotient hypothesis, which
-can fail for finite operands with a finite quotient.
+quotient. The multiplication theorem needs its exponent hypothesis for arbitrary unpacked
+operands: in binary64 the product of two values `.finite .positive 1 0` would otherwise pack as a
+subnormal. This module proves that hypothesis for operands unpacked from format words, proves
+the division theorem's exponent hypothesis for all nonzero mantissas, and removes the quotient
+hypothesis, which can fail for finite operands with a finite quotient.
 
 The precondition holds exactly when the exponent is at or below the format's least exponent or
 the mantissa has at least as many bits as the format's precision. Every finite value unpacked
 from a format word has that shape, a product of two such values keeps it, and `divCore` chooses
 its exponent so that every quotient of nonzero mantissas has it. `divCore` returns a zero
 provisional quotient when the exact quotient lies below one unit at the exponent it selects, as
-for the least positive subnormal divided by `1.5`. Its remainder accuracy still locates the
-quotient, and `toReal_ofModel_roundWithAccuracy_zero_eq_roundAt` rounds that case.
+for the least positive subnormal divided by `1.5`. The selected exponent and the remainder
+accuracy together still locate the quotient, and
+`toReal_ofModel_roundWithAccuracy_zero_eq_roundAt` rounds that case.
 
 The resulting theorems `toReal_ofModel_mul_toModel_eq_roundAt` and
 `toReal_ofModel_div_toModel_eq_roundAt` take finite operands of any conventional IEEE descriptor
@@ -286,26 +290,8 @@ private theorem accuracyRepresents_zero_accuracyOfFraction
     (numerator denominator : Nat) (hlt : numerator < denominator) :
     accuracyRepresents 0 (accuracyOfFraction numerator denominator)
       ((numerator : Real) / denominator) := by
-  have hdenominator : (0 : Real) < denominator := by
-    exact_mod_cast Nat.zero_lt_of_lt hlt
-  unfold accuracyOfFraction
-  split_ifs with hnumerator
-  · simp [accuracyRepresents, hnumerator]
-  rcases hcompare : compare (2 * numerator) denominator with _ | _ | _ <;>
-    simp only [accuracyRepresents, Nat.cast_zero, zero_add]
-  · have hhalf : (2 : Real) * numerator < denominator := by
-      exact_mod_cast Nat.compare_eq_lt.mp hcompare
-    have hpos : (0 : Real) < numerator := by
-      exact_mod_cast Nat.pos_of_ne_zero hnumerator
-    exact ⟨div_pos hpos hdenominator, (div_lt_iff₀ hdenominator).2 (by linarith)⟩
-  · have hhalf : (2 : Real) * numerator = denominator := by
-      exact_mod_cast Nat.compare_eq_eq.mp hcompare
-    exact (div_eq_iff hdenominator.ne').2 (by linarith)
-  · have hhalf : (denominator : Real) < 2 * numerator := by
-      exact_mod_cast Nat.compare_eq_gt.mp hcompare
-    have hltReal : (numerator : Real) < denominator := by
-      exact_mod_cast hlt
-    exact ⟨(lt_div_iff₀ hdenominator).2 (by linarith), (div_lt_one hdenominator).2 hltReal⟩
+  simpa only [Nat.div_eq_of_lt hlt, Nat.mod_eq_of_lt hlt] using
+    accuracyRepresents_accuracyOfFraction numerator denominator (Nat.zero_lt_of_lt hlt).ne'
 
 /--
 For finite nonzero operands and a finite result, Lean core's unpacked division has the same
@@ -313,7 +299,7 @@ independent nearest-even real semantics as `Model.div`.
 
 This is `toReal_ofModel_div_finite_eq_roundAt` without its hypotheses on `divCore`:
 `divCore_exponent_le_targetExponent` supplies the exponent precondition, and a zero provisional
-quotient is rounded from its remainder accuracy by
+quotient is rounded from its exponent and remainder accuracy by
 `toReal_ofModel_roundWithAccuracy_zero_eq_roundAt`.
 -/
 theorem toReal_ofModel_div_finite_eq_roundAt_of_isFinite
@@ -434,8 +420,9 @@ For finite operands and a finite result, Lean core's unpacked multiplication of 
 unpacked from two format words is one nearest-even rounding of their exact real product.
 
 Unlike `toReal_ofModel_mul_finite_eq_roundAt`, there is no exponent hypothesis: unpacked format
-words satisfy the precondition of `roundWithAccuracy` and their product keeps it. Signed zeros are
-finite operands.
+words satisfy the precondition of `roundWithAccuracy` and their product keeps it. Arbitrary
+unpacked operands need not, so that theorem keeps its hypothesis. Signed zeros are finite
+operands.
 -/
 theorem toReal_ofModel_mul_toModel_eq_roundAt {fmt : FloatFormat} (hfmt : fmt.isIEEE = true)
     (x y : Model fmt) (hx : isFinite x = true) (hy : isFinite y = true)
