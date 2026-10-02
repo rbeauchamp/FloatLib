@@ -19,12 +19,12 @@ quotient. This module proves the exponent hypotheses and removes the quotient hy
 can fail for finite operands with a finite quotient.
 
 The precondition holds exactly when the exponent is at or below the format's least exponent or
-the mantissa has a leading bit at the format's precision. Every finite value unpacked from a
-format word has that shape, a product of two such values keeps it, and `divCore` chooses its
-exponent so that every quotient of nonzero mantissas has it. `divCore` returns a zero provisional
-quotient when the exact quotient lies below one unit at the exponent it selects, as for the least
-positive subnormal divided by `1.5`. Its remainder accuracy still locates the quotient, and
-`toReal_ofModel_roundWithAccuracy_zero_eq_roundAt` rounds that case.
+the mantissa has at least as many bits as the format's precision. Every finite value unpacked
+from a format word has that shape, a product of two such values keeps it, and `divCore` chooses
+its exponent so that every quotient of nonzero mantissas has it. `divCore` returns a zero
+provisional quotient when the exact quotient lies below one unit at the exponent it selects, as
+for the least positive subnormal divided by `1.5`. Its remainder accuracy still locates the
+quotient, and `toReal_ofModel_roundWithAccuracy_zero_eq_roundAt` rounds that case.
 
 The resulting theorems `toReal_ofModel_mul_toModel_eq_roundAt` and
 `toReal_ofModel_div_toModel_eq_roundAt` take finite operands of any conventional IEEE descriptor
@@ -47,7 +47,7 @@ open FloatLib.Floats.Formats.Flocq
 /--
 The precondition of Lean's `roundWithAccuracy`, that reaching the target exponent needs no left
 shift, holds exactly when the exponent is at or below the format's least exponent or the mantissa
-has a leading bit at the format's precision.
+has at least as many bits as the format's precision.
 -/
 theorem le_targetExponent_totalExponent_iff (spec : Float.Model.Format)
     (mantissa : Nat) (exponent : Int) :
@@ -68,8 +68,8 @@ theorem le_targetExponent_totalExponent_iff (spec : Float.Model.Format)
 
 /--
 Multiplying two nonzero mantissas and adding their exponents preserves the precondition of Lean's
-`roundWithAccuracy`: a leading bit in either factor gives one in the product, and two exponents
-at or below the least exponent have a sum at or below it.
+`roundWithAccuracy`: a factor with at least as many bits as the format's precision gives a product
+with at least as many, and two exponents at or below the least exponent have a sum at or below it.
 -/
 theorem add_le_targetExponent_totalExponent_mul (spec : Float.Model.Format)
     {mantissa₁ mantissa₂ : Nat} {exponent₁ exponent₂ : Int}
@@ -121,8 +121,8 @@ theorem le_targetExponent_totalExponent_of_toModel_eq_finite {fmt : FloatFormat}
 /--
 The exponent chosen by Lean's `divCore` satisfies the precondition of `roundWithAccuracy` for every
 pair of nonzero mantissas. Above the least exponent, the numerator is shifted far enough for the
-quotient to have a leading bit at the format's precision; a zero quotient therefore occurs only at
-or below the least exponent.
+quotient to have at least as many bits as the format's precision; a zero quotient therefore occurs
+only at or below the least exponent.
 -/
 theorem divCore_exponent_le_targetExponent (spec : Float.Model.Format)
     {mantissa₁ mantissa₂ : Nat} (exponent₁ exponent₂ : Int)
